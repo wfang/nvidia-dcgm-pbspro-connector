@@ -1,0 +1,74 @@
+{
+    "resources": {
+        "ngpus": {
+            "resources": {
+                "maxGpuMemoryUsed": {
+                    "PBS_resource": "GPU_maxGpuMemoryUsed",
+                    "report_usage": true,
+                    "aggregate_usage": true,
+                    "unit": "B"
+                },
+                "startTime": {
+                    "PBS_resource": "GPU_startTime",
+                    "report_usage": true,
+                    "aggregate_usage": false,
+                    "unit": ""
+                },
+                "endTime": {
+                    "PBS_resource": "GPU_endTime",
+                    "report_usage": true,
+                    "aggregate_usage": false,
+                    "unit": ""
+                },
+                "energyConsumed": {
+                    "PBS_resource": "GPU_energyConsumed",
+                    "report_usage": true,
+                    "aggregate_usage": true,
+                    "unit": "W"
+                },
+                "memoryClock": {
+                    "PBS_resource": "GPU_memoryClock",
+                    "report_usage": true,
+                    "aggregate_usage": false,
+                    "unit": "MHz"
+                },
+                "memoryUtilization": {
+                    "PBS_resource": "GPU_memoryUtilization",
+                    "report_usage": true,
+                    "aggregate_usage": false,
+                    "unit": "%"
+                },
+                "smClock": {
+                    "PBS_resource": "GPU_smClock",
+                    "report_usage": true,
+                    "aggregate_usage": false,
+                    "unit": "MHz"
+                },
+                "smUtilization": {
+                    "PBS_resource": "GPU_smUtilization",
+                    "report_usage": true,
+                    "aggregate_usage": false,
+                    "unit": "%"
+                },
+                "duration": {
+                    "PBS_resource": "GPU_duration",
+                    "report_usage": true,
+                    "aggregate_usage": true,
+                    "unit": "secs"
+                }
+            },
+            "run_health_check": true,
+            "run_diagnostic_check": true,
+            "missing_value_string": "*",
+            "path_to_pbs_scripts": "/opt/pbs/nvidia/PBS_scripts",
+            "using_cgroups": false
+        }
+    },
+    "exclude_hosts": [],
+    "enable_validation": false,
+    "validation_mode": "Warning",
+    "pfs_job_dir": "/global_fs1/$USER/.pbs_resource_results",
+    "num_period_cycles_before_clean": 2,
+    "num_secs_to_wait_for_sisters": 2,
+    "run_only_on_hosts": []
+}

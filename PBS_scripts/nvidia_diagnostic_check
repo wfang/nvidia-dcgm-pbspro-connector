@@ -1,0 +1,120 @@
+#!/bin/python
+
+# (C) Copyright 2015-2017 Altair Engineering, Inc.  All rights reserved.
+# This code is provided "as is" without any warranty, express or implied, or
+# indemnification of any kind.  All other terms and conditions are as
+# specified in the Altair PBS EULA.
+
+import os
+import sys
+import getopt
+import json
+
+path = os.path.join(os.sep, 'usr', 'src', 'dcgm', 'bindings')
+if path not in sys.path:
+    sys.path.append(path)
+
+imported_dcgm_modules = True
+
+
+try:
+    import pydcgm
+    import dcgm_structs
+    import dcgm_fields
+    import dcgm_agent
+    import dcgmvalue
+except:
+    imported_dcgm_modules = False
+        
+
+def show_usage():
+    print 'Usage: %s -i <gpu_id list>' % os.path.basename(sys.argv[0])
+
+
+try:
+    opts, args = getopt.getopt(sys.argv[1:], 'i:')
+except:
+    show_usage()
+    sys.exit(1)
+
+
+# Added to handle non-homogeneous mix of GPUs automatically
+gpu_ids = []
+
+
+for o, a in opts:
+    if o == '-i':
+        gpu_ids = json.loads(a)
+
+if not (gpu_ids):
+    show_usage()
+    sys.exit(1)
+
+
+def delete_group(handleObj, groupObj):
+    groupObj.Delete()
+        
+    ## Destroy the group
+    del(groupObj)
+    groupObj = None
+
+    ## Shut down the host engine
+    del(handleObj)
+    handleObj = None
+
+
+health_info = []
+
+def diagnose(grpName, gpuIds):
+    if imported_dcgm_modules:
+        dcgmHandle = pydcgm.DcgmHandle(ipAddress='127.0.0.1', opMode=dcgm_structs.DCGM_OPERATION_MODE_AUTO)
+    
+        ## Get a handle to the system level object for DCGM
+        dcgmSystem = dcgmHandle.GetSystem()
+    
+        ## Create a empty group. (Default group is comprised of all the GPUs on the node)
+        ## The method returns an opaque handle (groupId) to identify the newly created group.
+        dcgmGroup = pydcgm.DcgmGroup(dcgmHandle, groupName=grpName, groupType=dcgm_structs.DCGM_GROUP_EMPTY)
+
+        ## Add type of GPU requested
+        for gpuId in gpuIds:
+            dcgmGroup.AddGpu(int(gpuId))
+
+        ## Debug: Invoke method to get gpu IDs of the members of the newly-created group
+        #groupGpuIds = dcgmGroup.GetGpuIds()
+    
+        ## This will go ahead and perform a "prologue" diagnostic
+        ## to make sure everything is ready to run
+        ## currently this calls an outside diagnostic binary but eventually
+        ## that binary will be merged into the DCGM framework
+        ## The "response" is a dcgmDiagResponse structure that can be parsed for errors.
+        response = dcgmGroup.action.RunDiagnostic(dcgm_structs.DCGM_DIAG_LVL_SHORT)
+
+        if (dcgm_structs.DCGM_DIAG_RESULT_PASS !=  response.blacklist):
+            health_info.append('blacklist')
+        if (dcgm_structs.DCGM_DIAG_RESULT_PASS !=  response.nvmlLibrary):
+            health_info.append('nvmlLibrary')
+        if (dcgm_structs.DCGM_DIAG_RESULT_PASS !=  response.cudaMainLibrary):
+            health_info.append('cudaMainLibrary')
+        #if (dcgm_structs.DCGM_DIAG_RESULT_PASS !=  response.cudaRuntimeLibrary):
+            #    health_info.append('cudaRuntimeLibrary')
+        if (dcgm_structs.DCGM_DIAG_RESULT_PASS !=  response.permissions):
+            health_info.append('permissions')
+        #if (dcgm_structs.DCGM_DIAG_RESULT_PASS !=  response.persistenceMode):
+            #    health_info.append('persistenceMode')
+        #if (dcgm_structs.DCGM_DIAG_RESULT_PASS !=  response.environment):
+            #    health_info.append('environment')
+        #if (dcgm_structs.DCGM_DIAG_RESULT_PASS !=  response.pageRetirement):
+            #    health_info.append('pageRetirement')
+        #if (dcgm_structs.DCGM_DIAG_RESULT_PASS !=  response.graphicsProcesses):
+            #    health_info.append('graphicsProcesses')                
+    
+        delete_group(health_info, dcgmGroup)
+    else:
+        health_info.append('DCGMModuleImport')
+
+
+for i in range(len(gpu_ids)):
+    diagnose("gpu-diag-test", gpu_ids[i])
+
+print json.dumps(health_info)
