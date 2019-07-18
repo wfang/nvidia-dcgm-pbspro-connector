@@ -1,0 +1,79 @@
+#!/bin/python
+
+# (C) Copyright 2015-2017 Altair Engineering, Inc.  All rights reserved.
+# This code is provided "as is" without any warranty, express or implied, or
+# indemnification of any kind.  All other terms and conditions are as
+# specified in the Altair PBS EULA.
+
+import os
+import sys
+import getopt
+import json
+
+path = os.path.join(os.sep, 'usr', 'src', 'dcgm', 'bindings')
+if path not in sys.path:
+    sys.path.append(path)
+
+import pydcgm
+import dcgm_structs
+import dcgm_fields
+import dcgm_agent
+import dcgmvalue
+
+        
+def show_usage():
+    print 'Usage: %s -g <gpu_id list> -j <job id> -w <walltime secs>' % os.path.basename(sys.argv[0])
+
+try:
+    opts, args = getopt.getopt(sys.argv[1:], 'g:j:w:')
+except:
+    show_usage()
+    sys.exit(1)
+    
+
+gpu_list = []
+job_id = ''
+
+for o, a in opts:
+    if o == '-g':
+        gpu_list = json.loads(a)
+    elif o == '-j':
+        job_id = a
+    elif o == '-w':
+        walltime_secs = a
+        
+if not (gpu_list and job_id and walltime_secs):
+    show_usage()
+    sys.exit(1)
+
+    
+#print 'gpu_list', gpu_list
+#print 'job_id', job_id
+
+
+def setup_dcgm_group(group_name, gpus):
+    # DCGM v1.3.3 introduced persistAfterDisconnect parameter to define persistance of the connection.
+    # In previous versions, default behavior was perhaps to persist the connection.
+    handleObj = pydcgm.DcgmHandle(ipAddress='127.0.0.1', opMode=dcgm_structs.DCGM_OPERATION_MODE_AUTO, persistAfterDisconnect=True)
+    
+    systemObj = handleObj.GetSystem()
+    
+    groupObj = systemObj.GetEmptyGroup(group_name)
+    
+    for gpu in gpus:
+        groupObj.AddGpu(int(gpu))
+    
+    gpuIds = groupObj.GetGpuIds() 
+    #print 'gpuIds %s' % (gpuIds)
+    
+    return handleObj, groupObj
+    
+    
+handleObj, groupObj = setup_dcgm_group(job_id, gpu_list)
+
+groupObj.stats.WatchJobFields(1000000, int(walltime_secs), 0)
+
+# Notify DCGM to start collecting stats
+groupObj.stats.StartJobStats(job_id)
+
+print str(groupObj.GetId().value)

@@ -1,0 +1,213 @@
+#!/bin/python
+
+# (C) Copyright 2015-2017 Altair Engineering, Inc.  All rights reserved.
+# This code is provided "as is" without any warranty, express or implied, or
+# indemnification of any kind.  All other terms and conditions are as
+# specified in the Altair PBS EULA.
+
+import os
+import sys
+import getopt
+import json
+
+path = os.path.join(os.sep, 'usr', 'src', 'dcgm', 'bindings')
+if path not in sys.path:
+    sys.path.append(path)
+
+import pydcgm
+import dcgm_structs
+import dcgm_fields
+import dcgm_agent
+import dcgmvalue
+
+        
+def show_usage():
+    print 'Usage: %s -g <gpu_id list> -j <job id> -r <resource list>' % os.path.basename(sys.argv[0])
+
+try:
+    opts, args = getopt.getopt(sys.argv[1:], 'G:j:r:')
+except:
+    show_usage()
+    sys.exit(1)
+    
+
+group_id = None
+job_id = ''
+resources = []
+
+for o, a in opts:
+    if o == '-G':
+        group_id = a
+    elif o == '-j':
+        job_id = a
+    elif o == '-r':
+        resources = json.loads(a)
+        
+if not (group_id and job_id and resources):
+    show_usage()
+    sys.exit(1)
+
+
+
+def get_dcgm_group(group_id):
+    handleObj = pydcgm.DcgmHandle(ipAddress='127.0.0.1', opMode=dcgm_structs.DCGM_OPERATION_MODE_AUTO)
+    
+    systemObj = handleObj.GetSystem()
+    
+    groupObj = pydcgm.DcgmGroup(handleObj, groupId = int(group_id))
+    
+    return handleObj, groupObj
+    
+    
+def delete_group(handleObj, groupObj):
+    groupObj.Delete()
+        
+    ## Destroy the group
+    del(groupObj)
+    groupObj = None
+
+    ## Shut down the host engine
+    del(handleObj)
+    handleObj = None
+
+
+def get_defined_value(value):
+    v = dcgmvalue.DcgmValue(value)
+
+    if isinstance(value, dict):
+        return value
+    try:
+        if (v.IsBlank()):
+            return None
+        else:
+            return value
+    except:
+        return value
+
+
+def convert_dcgmStatSummaryInt64_t(info):
+    data = {}
+    if get_defined_value(info.minValue) != None: data['minValue'] = info.minValue
+    if get_defined_value(info.maxValue) != None: data['maxValue'] = info.maxValue
+    if get_defined_value(info.average) != None: data['average'] = info.average
+     
+    return data
+
+
+def convert_dcgmStatSummaryInt32_t(info):
+    data = {}
+    if get_defined_value(info.minValue) != None: data['minValue'] = info.minValue
+    if get_defined_value(info.maxValue) != None: data['maxValue'] = info.maxValue
+    if get_defined_value(info.average) != None: data['average'] = info.average
+    
+    return data
+
+
+def convert_dcgmGpuUsageInfo_t_not_used(info):
+    data = {}
+    if get_defined_value(info.minValue) != None: data['minValue'] = info.minValue
+    if get_defined_value(info.maxValue) != None: data['maxValue'] = info.maxValue
+    if get_defined_value(info.average) != None: data['average'] = info.average
+    
+    return data
+
+
+def convert_dcgmJobInfo_v1(info):
+    data = {}
+
+    if get_defined_value(info.version) != None: data['version'] = info.version
+    if get_defined_value(info.numGpus) != None: data['numGpus'] = info.numGpus
+    if get_defined_value(convert_dcgmGpuUsageInfo_t(info.summary)) != None: data['summary'] = convert_dcgmGpuUsageInfo_t(info.summary)
+    if get_defined_value(info.gpus) != None: data['gpus'] = info.gpus
+    
+    return data
+    
+    
+def convert_dcgmGpuUsageInfo_t(info):
+    data = {}
+    
+    data['gpuId'] = info.gpuId
+    if get_defined_value(info.energyConsumed) != None: data['energyConsumed'] = info.energyConsumed
+    if get_defined_value(convert_dcgmStatSummaryInt64_t(info.pcieRxBandwidth)) != None: data['pcieRxBandwidth'] = convert_dcgmStatSummaryInt64_t(info.pcieRxBandwidth)
+    if get_defined_value(convert_dcgmStatSummaryInt64_t(info.pcieTxBandwidth)) != None: data['pcieTxBandwidth'] = convert_dcgmStatSummaryInt64_t(info.pcieTxBandwidth)
+    if get_defined_value(info.pcieReplays) != None: data['pcieReplays'] = info.pcieReplays
+    if get_defined_value(info.startTime) != None: data['startTime'] = info.startTime
+    if get_defined_value(info.endTime) != None: data['endTime'] = info.endTime
+    data['smUtilization'] = convert_dcgmStatSummaryInt32_t(info.smUtilization)
+    data['memoryUtilization'] = convert_dcgmStatSummaryInt32_t(info.memoryUtilization)
+    if get_defined_value(info.eccSingleBit) != None: data['eccSingleBit'] = info.eccSingleBit
+    if get_defined_value(info.eccDoubleBit) != None: data['eccDoubleBit'] = info.eccDoubleBit
+    data['memoryClock'] = convert_dcgmStatSummaryInt32_t(info.memoryClock)
+    data['smClock'] = convert_dcgmStatSummaryInt32_t(info.smClock)
+    data['maxGpuMemoryUsed'] = info.maxGpuMemoryUsed
+    if get_defined_value(info.powerViolationTime) != None: data['powerViolationTime'] = info.powerViolationTime
+    if get_defined_value(info.thermalViolationTime) != None: data['thermalViolationTime'] = info.thermalViolationTime
+    if get_defined_value(info.reliabilityViolationTime) != None: data['reliabilityViolationTime'] = info.reliabilityViolationTime
+    if get_defined_value(info.boardLimitViolationTime) != None: data['boardLimitViolationTime'] = info.boardLimitViolationTime
+    if get_defined_value(info.lowUtilizationTime) != None: data['lowUtilizationTime'] = info.lowUtilizationTime
+    if get_defined_value(info.syncBoostTime) != None: data['syncBoostTime'] = info.syncBoostTime
+
+    data['numComputePids'] = info.numComputePids
+    data['computePids'] = []
+    for i in range(0, data['numComputePids']):
+        data['computePids'].append(info.computePids[i])
+        
+    data['numGraphicsPids'] = info.numGraphicsPids
+    data['graphicsPids'] = []
+    for i in range(0, data['numGraphicsPids']):
+        data['graphicsPids'].append(info.graphicsPids[i])
+
+    data['numXidCriticalErrors'] = info.numXidCriticalErrors
+    data['xidCriticalErrorsTs'] = []
+    for i in range(0, data['numXidCriticalErrors']):
+        data['xidCriticalErrorsTs'].append(info.xidCriticalErrorsTs[i])
+
+    return data
+
+
+handleObj, groupObj = get_dcgm_group(group_id)
+
+# Notify DCGM to stop collecting stats
+groupObj.stats.StopJobStats(job_id)
+
+# get job stats
+jobInfo = groupObj.stats.GetJobStats(job_id)
+
+jobInfoDict = convert_dcgmJobInfo_v1(jobInfo)
+
+
+gpus_info = []
+for gpu in range(0, jobInfoDict['numGpus']):
+    gpuInfoDict = convert_dcgmGpuUsageInfo_t(jobInfoDict['gpus'][gpu])
+    
+    gpu_str = 'gpu%s:' % gpuInfoDict['gpuId']
+    gpu_res = []
+    
+    for res in resources:
+        if res in gpuInfoDict.keys():
+            if isinstance(gpuInfoDict[res], dict):
+                for sub_res in gpuInfoDict[res]:
+                    gpu_res.append('%s_%s=%s' % (res, sub_res, gpuInfoDict[res][sub_res]))
+            else:
+                if res == "energyConsumed":
+                    gpu_res.append('%s=%s' % (res, round((gpuInfoDict[res]/1000)/((int(gpuInfoDict['endTime']) - int(gpuInfoDict['startTime']))/1000000.0),2)))
+                    #gpu_res.append('%s=%s' % (res, (gpuInfoDict[res]/1000)))
+                else:
+                    gpu_res.append('%s=%s' % (res, gpuInfoDict[res]))
+
+    # Handle special cases
+    if 'duration' in resources:
+        if 'startTime' in gpuInfoDict.keys() and 'endTime' in gpuInfoDict.keys():
+            gpu_res.append('duration=%.2f' % ((int(gpuInfoDict['endTime']) - int(gpuInfoDict['startTime']))/1000000.0))
+    
+
+    gpu_str += ':'.join(gpu_res)
+    
+    gpus_info.append(gpu_str)
+
+resource_string = '+'.join(gpus_info)
+
+
+delete_group(handleObj, groupObj)
+
+print json.dumps(resource_string)

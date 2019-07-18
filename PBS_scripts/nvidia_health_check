@@ -1,0 +1,93 @@
+#!/bin/python
+
+# (C) Copyright 2015-2017 Altair Engineering, Inc.  All rights reserved.
+# This code is provided "as is" without any warranty, express or implied, or
+# indemnification of any kind.  All other terms and conditions are as
+# specified in the Altair PBS EULA.
+
+import os
+import sys
+import getopt
+import json
+
+path = os.path.join(os.sep, 'usr', 'src', 'dcgm', 'bindings')
+if path not in sys.path:
+    sys.path.append(path)
+
+imported_dcgm_modules = True
+
+try:
+    import pydcgm
+    import dcgm_structs
+    import dcgm_fields
+    import dcgm_agent
+    import dcgmvalue
+except:
+    imported_dcgm_modules = False
+
+        
+
+
+def delete_group(handleObj, groupObj):
+    groupObj.Delete()
+        
+    ## Destroy the group
+    del(groupObj)
+    groupObj = None
+
+    ## Shut down the host engine
+    del(handleObj)
+    handleObj = None
+
+
+output = {}
+health = ''
+comment = ''
+
+if imported_dcgm_modules:
+    dcgmHandle = pydcgm.DcgmHandle(ipAddress='127.0.0.1', opMode=dcgm_structs.DCGM_OPERATION_MODE_AUTO)
+    
+    ## Get a handle to the system level object for DCGM
+    dcgmSystem = dcgmHandle.GetSystem()
+    
+    ## Create a default group. (Default group is comprised of all the GPUs on the node)
+    ## Let's call the group as "all_gpus_group". The method returns an opaque handle (groupId) to
+    ## identify the newly created group.
+    dcgmGroup = pydcgm.DcgmGroup(dcgmHandle, groupName="all_gpus_group", groupType=dcgm_structs.DCGM_GROUP_DEFAULT)
+    
+    ## Invoke method to get gpu IDs of the members of the newly-created group
+    groupGpuIds = dcgmGroup.GetGpuIds()
+    
+    ## Add the health watches
+    newSystems = dcgm_structs.DCGM_HEALTH_WATCH_ALL
+    dcgmGroup.health.Set(newSystems)
+    dcgmSystem.UpdateAllFields(1)
+    
+    health = ''
+    
+    try:
+        ## Invoke Health checks
+        group_health = dcgmGroup.health.Check()
+        #pbs.logmsg(pbs.EVENT_DEBUG, "group_health %s" % (group_health))
+        
+        if group_health.overallHealth == dcgm_structs.DCGM_HEALTH_RESULT_PASS:
+            health = 'Pass'
+        elif group_health.overallHealth == dcgm_structs.DCGM_HEALTH_RESULT_WARN:
+            health = 'Warning'
+        elif group_health.overallHealth == dcgm_structs.DCGM_HEALTH_RESULT_FAIL:
+            health = 'Error'
+        else :
+            health = 'N/A'
+    
+    except dcgm_structs.DCGMError as e:
+            health = 'Error'
+    
+    delete_group(dcgmHandle, dcgmGroup)
+else:
+    health = 'Error'
+    comment = 'Failed to load DCGM modules'
+
+output['health'] = health
+output['comment'] = comment
+
+print json.dumps(output)
