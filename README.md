@@ -6,7 +6,7 @@ PBSPro with NVIDIA Data Center GPU Management (DCGM) integration package.
 
 Prerequisite:
 -------------
- - PBSPro 13.x onwards 
+ - PBSPro 18.x and 19.x
  - DCGM v1.3.3 or later
  - datacenter-gpu-manager-375.41-1.x86_64.rpm and higher is installed with all the necessary nvidia packages.
  - nv-hostengine  must be running.
