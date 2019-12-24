@@ -1534,10 +1534,17 @@ def exclude_host(config):
     exclude_host = False
     hostname = pbs.get_local_nodename()
 
-    if hostname in config['run_only_on_hosts']:
-        exclude_host = False
-    elif hostname in config['exclude_hosts']:
-        exclude_host = True
+    if config['run_only_on_hosts']:
+        if hostname in config['run_only_on_hosts']:
+            exclude_host = False
+        else:
+            exclude_host = True
+    else:
+        if config['exclude_hosts']:
+            if hostname in config['exclude_hosts']:
+                exclude_host = True
+            else:
+                exclude_host = False
 
     return exclude_host
 
