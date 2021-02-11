@@ -42,7 +42,7 @@ import sys
 import getopt
 import json
 
-path = os.path.join(os.sep, 'usr', 'src', 'dcgm', 'bindings')
+path = os.path.join(os.sep, 'usr', 'local', 'dcgm', 'bindings')
 if path not in sys.path:
     sys.path.append(path)
 
